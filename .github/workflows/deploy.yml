@@ -2,7 +2,7 @@ name: Build and Push to ECR
 
 on:
   push:
-    branches: [ "production" ] # Workflow sẽ chạy mỗi khi bạn push vào nhánh này
+    branches: [ "production" ]
 
 jobs:
   deploy:
@@ -29,16 +29,5 @@ jobs:
         ECR_REPOSITORY: llm-aws-repo
         IMAGE_TAG: latest
       run: |
-        # Build Docker image từ Dockerfile ở thư mục gốc
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        
-        # Push image lên Amazon ECR
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-    - name: Update Lambda Function
-      #run: |
-        # Lệnh này yêu cầu GitHub Action cập nhật Lambda sử dụng Image mới nhất vừa push
-        # Thay <TEN_LAMBDA_CUA_BAN> bằng tên function thật trên AWS (ví dụ: my-chat-app-lambda)
-        #aws lambda update-function-code \
-          #--function-name <TEN_LAMBDA_CUA_BAN> \
-          #--image-uri 441384477513.dkr.ecr.ap-southeast-1.amazonaws.com/llm-aws-repo:latest
