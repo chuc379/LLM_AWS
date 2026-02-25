@@ -40,23 +40,28 @@ load_dotenv()
 def create_app() -> FastAPI:
     """Factory function để tạo FastAPI app với dependency injection"""
     
-    # Configuration
+    # Configuration - Đã loại bỏ hardcode strings
     config = {
         # AWS
-        "aws_access": os.getenv("AWS_ACCESS_KEY_ID", "AKIAWNREQUNE6TK6Y5M7"),
-        "aws_secret": os.getenv("AWS_SECRET_ACCESS_KEY", "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"),
+        "aws_access": os.getenv("AWS_ACCESS_KEY_ID"),
+        "aws_secret": os.getenv("AWS_SECRET_ACCESS_KEY"),
         "aws_region": os.getenv("AWS_REGION", "ap-southeast-1"),
         
         # Qdrant
-        "qdrant_url": os.getenv("QDRANT_URL", "https://a15c7255-307c-476b-8067-b79f6dac0c74.us-west-1-0.aws.cloud.qdrant.io"),
-        "qdrant_key": os.getenv("QDRANT_API_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.U8yUySqfl97_BvbwvUiK45_xdea3S68r6gQCOOPDcPQ"),
+        "qdrant_url": os.getenv("QDRANT_URL"),
+        "qdrant_key": os.getenv("QDRANT_API_KEY"),
         
         # Gemini
-        "gemini_key": os.getenv("GEMINI_API_KEY", "AIzaSyDVJBtZe27XWD3aVBha-t25XinVjEQmnQI"),
+        "gemini_key": os.getenv("GEMINI_API_KEY"),
         
         # Vector DB Collection
-        "vector_collection": os.getenv("VECTOR_COLLECTION", "nfl_wiki_gemini_3072")
+        "vector_collection": os.getenv("VECTOR_COLLECTION")
     }
+    
+    # Kiểm tra nhanh xem các key quan trọng có bị thiếu không
+    missing_keys = [k for k, v in config.items() if v is None]
+    if missing_keys:
+        print(f"⚠️ Cảnh báo: Thiếu biến môi trường: {', '.join(missing_keys)}")
     
     print("🚀 Initializing application...")
     
@@ -116,7 +121,7 @@ def create_app() -> FastAPI:
     # Register routers
     print("🔌 Registering routers...")
     chat_router = create_chat_router(chat_usecase)
-    session_router = create_session_router()
+    session_router = create_session_router(long_memory_repo) 
     chat_history_router = create_chat_history_router(long_memory_repo)
     app.include_router(chat_router)
     app.include_router(session_router)

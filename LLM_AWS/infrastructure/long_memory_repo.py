@@ -6,8 +6,8 @@ import uuid
 import google.generativeai as genai
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from typing import List
 
+from typing import List, Dict, Any
 import sys
 from pathlib import Path
 parent_dir = Path(__file__).parent.parent.parent
@@ -98,8 +98,8 @@ class QdrantLongMemoryRepository(ILongMemoryRepository):
             for hit in results
         ]
     
-    def save_chat_turn(self, user_id: str, session_id: str, user_msg: str, ai_msg: str) -> None:
-        """Lưu lượt chat vào long memory"""
+    def save_chat_turn(self, user_id: str, session_id: str, user_msg: str, ai_msg: str, title: str = "Cuộc trò chuyện mới") -> None:
+        """Lưu lượt chat kèm theo title để hiển thị ở danh sách session"""
         combined_text = f"Người dùng: {user_msg}\nAI: {ai_msg}"
         vector = self._get_embedding(combined_text, is_query=False)
         
@@ -112,6 +112,7 @@ class QdrantLongMemoryRepository(ILongMemoryRepository):
                     payload={
                         "user_id": user_id,
                         "session_id": session_id,
+                        "title": title, # Lưu title vào đây
                         "user_msg": user_msg,
                         "ai_msg": ai_msg,
                         "full_content": combined_text,
@@ -120,7 +121,62 @@ class QdrantLongMemoryRepository(ILongMemoryRepository):
                 )
             ]
         )
-    
+
+    def get_unique_sessions(self, user_id: str) -> List[Dict[str, Any]]:
+            """
+            LẤY DANH SÁCH SESSION DUY NHẤT TỪ QDRANT (Sử dụng Scroll để đảm bảo tính tương thích)
+            """
+            try:
+                from datetime import datetime
+                
+                # 1. Lấy dữ liệu thô từ Qdrant (Scroll hoạt động ổn định trên mọi phiên bản)
+                # Chúng ta quét 100 bản ghi gần nhất để tìm các session_id khác nhau
+                records, _ = self.client.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=models.Filter(
+                        must=[
+                            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+                        ]
+                    ),
+                    limit=100,
+                    with_payload=True,
+                    with_vectors=False
+                )
+
+                # 2. Dùng Dictionary để lọc ra các session_id duy nhất và lấy tin nhắn mới nhất
+                unique_sessions_dict = {}
+                for rec in records:
+                    p = rec.payload
+                    s_id = p.get("session_id")
+                    if not s_id:
+                        continue
+                    
+                    # Lấy timestamp để so sánh
+                    current_ts = p.get("timestamp", 0)
+                    
+                    # Nếu chưa thấy session này HOẶC tin nhắn này mới hơn tin nhắn đã lưu trong dict
+                    if s_id not in unique_sessions_dict or current_ts > unique_sessions_dict[s_id]["_ts"]:
+                        unique_sessions_dict[s_id] = {
+                            "session_id": s_id,
+                            "title": p.get("title", "Cuộc trò chuyện mới"),
+                            "created_at": datetime.fromtimestamp(current_ts).isoformat() if current_ts > 0 else datetime.now().isoformat(),
+                            "last_message": (p.get("ai_msg", "")[:50] + "...") if p.get("ai_msg") else "",
+                            "_ts": current_ts  # Dùng nội bộ để sắp xếp
+                        }
+
+                # 3. Chuyển đổi thành danh sách và sắp xếp theo thời gian mới nhất lên đầu
+                sessions = list(unique_sessions_dict.values())
+                sessions.sort(key=lambda x: x['_ts'], reverse=True)
+                
+                # Xóa trường tạm thời _ts trước khi trả về
+                for s in sessions:
+                    s.pop("_ts", None)
+                
+                return sessions
+
+            except Exception as e:
+                print(f"❌ Error fetching unique sessions with scroll: {e}")
+                return []    
     def get_session_chat_turns(self, user_id: str, session_id: str, limit: int = 50):
         """Lấy các lượt chat (user_msg, ai_msg, timestamp) của một session từ Qdrant"""
         try:

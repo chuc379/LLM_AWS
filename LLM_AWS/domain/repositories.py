@@ -37,7 +37,11 @@ class ILongMemoryRepository(ABC):
     def clear_session(self, user_id: str, session_id: str) -> None:
         """Xóa session"""
         pass
-
+    
+    @abstractmethod
+    def get_unique_sessions(self, user_id: str) -> List[dict]:
+        """Lấy danh sách các session duy nhất của một user từ Qdrant"""
+        pass
 
 class IVectorDBRepository(ABC):
     """Interface cho Vector Database (Knowledge Base)"""

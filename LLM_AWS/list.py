@@ -1,7 +1,7 @@
 import google.generativeai as genai
 
 # Điền API Key của bạn vào đây
-GENAI_API_KEY = "AIzaSyDVJBtZe27XWD3aVBha-t25XinVjEQmnQI"
+GENAI_API_KEY = ""
 genai.configure(api_key=GENAI_API_KEY)
 
 print("--- Đang kiểm tra danh sách model hỗ trợ Embedding ---")

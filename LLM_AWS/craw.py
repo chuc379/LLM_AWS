@@ -6,8 +6,8 @@ import time
 import re
 
 # --- CẤU HÌNH AWS (ĐIỀN TẠI ĐÂY) ---
-AWS_ACCESS_KEY = "AKIAWNREQUNE6TK6Y5M7"
-AWS_SECRET_KEY = "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"
+AWS_ACCESS_KEY = ""
+AWS_SECRET_KEY = ""
 AWS_REGION = "ap-southeast-1"  # Ví dụ: Singapore là ap-southeast-1, US East là us-east-1
 
 S3_BUCKET_NAME = "knowknowledge-base-chuong"
