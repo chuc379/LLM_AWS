@@ -31,4 +31,9 @@ jobs:
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-#time 2
+
+    - name: Update Lambda Function
+      run: |
+        aws lambda update-function-code \
+          --function-name gemini-chatbot-973 \
+          --image-uri 441384477513.dkr.ecr.ap-southeast-1.amazonaws.com/llm-aws-repo:latest
