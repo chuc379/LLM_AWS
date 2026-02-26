@@ -35,15 +35,13 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 def create_session_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
     
-    @router.get("/", response_model=List[SessionResponse])
+    # SỬA: "/" -> "" để khớp chuẩn /api/sessions
+    @router.get("", response_model=List[SessionResponse])
     async def get_sessions(user_id: str = Depends(get_current_user)):
         logger.info(f"🔍 [GET SESSIONS] Đang quét danh sách hội thoại cho User: {user_id}")
         try:
-            # Truy vấn thực tế từ Qdrant
             unique_sessions = long_memory_repo.get_unique_sessions(user_id=user_id)
-            
             logger.info(f"📊 [GET SESSIONS] Thành công. Tìm thấy {len(unique_sessions)} hội thoại.")
-            
             return [
                 SessionResponse(
                     session_id=s["session_id"],
@@ -53,47 +51,37 @@ def create_session_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
                 ) for s in unique_sessions
             ]
         except Exception as e:
-            logger.error(f"❌ [GET SESSIONS] Lỗi truy vấn Qdrant: {str(e)}")
-            logger.error(traceback.format_exc())
+            logger.error(f"❌ [GET SESSIONS] Lỗi truy vấn Qdrant: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail="Không thể lấy danh sách session")
     
-    @router.post("/", response_model=SessionResponse)
+    # SỬA: "/" -> ""
+    @router.post("", response_model=SessionResponse)
     async def create_session(
         request: CreateSessionRequest,
         user_id: str = Depends(get_current_user)
     ):
         session_id = str(uuid.uuid4())
         logger.info(f"🆕 [CREATE SESSION] User {user_id} khởi tạo session mới: {session_id}")
-        
-        session = SessionResponse(
+        return SessionResponse(
             session_id=session_id,
             title=request.title,
             created_at=datetime.now().isoformat(),
             last_message=""
         )
-        return session
     
+    # Giữ nguyên các route có tham số vì chúng đã có cấu trúc path rõ ràng
     @router.delete("/{session_id}")
-    async def delete_session(
-        session_id: str,
-        user_id: str = Depends(get_current_user)
-    ):
-        logger.warning(f"🗑️ [DELETE SESSION] Đang xóa session {session_id} cho User {user_id}")
+    async def delete_session(session_id: str, user_id: str = Depends(get_current_user)):
+        logger.warning(f"🗑️ [DELETE SESSION] Đang xóa session {session_id}")
         try:
             long_memory_repo.clear_session(user_id=user_id, session_id=session_id)
-            logger.info(f"✅ [DELETE SESSION] Xóa thành công session {session_id}")
             return {"message": "Session deleted"}
         except Exception as e:
-            logger.error(f"❌ [DELETE SESSION] Lỗi khi xóa: {traceback.format_exc()}")
+            logger.error(f"❌ [DELETE SESSION] Lỗi: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=str(e))
     
     @router.put("/{session_id}/title")
-    async def update_session_title(
-        session_id: str,
-        request: CreateSessionRequest,
-        user_id: str = Depends(get_current_user)
-    ):
-        logger.info(f"✏️ [UPDATE TITLE] Cập nhật tiêu đề cho {session_id} thành: {request.title}")
+    async def update_session_title(session_id: str, request: CreateSessionRequest, user_id: str = Depends(get_current_user)):
         return {"session_id": session_id, "title": request.title}
     
     return router

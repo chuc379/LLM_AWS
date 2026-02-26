@@ -34,15 +34,15 @@ class ChatResponseDTO(BaseModel):
 # Router
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-
 def create_chat_router(chat_usecase: ChatUseCase) -> APIRouter:
     
-    @router.post("/", response_model=ChatResponseDTO)
+    # SỬA Ở ĐÂY: Thay "/" bằng ""
+    @router.post("", response_model=ChatResponseDTO)
     async def chat(
         request: ChatRequestDTO,
         user_id: str = Depends(get_current_user)
     ):
-        # Log khi bắt đầu nhận request
+        # ... giữ nguyên logic bên dưới ...
         logger.info(f"📩 Chat Request: User={user_id}, Session={request.session_id}")
         
         try:
@@ -52,7 +52,6 @@ def create_chat_router(chat_usecase: ChatUseCase) -> APIRouter:
                 message=request.message
             )
             
-            # Execute logic
             response = chat_usecase.execute(chat_request)
             
             logger.info(f"✅ Chat Success: Trả về {len(response.message)} ký tự")
@@ -66,7 +65,6 @@ def create_chat_router(chat_usecase: ChatUseCase) -> APIRouter:
             )
         
         except Exception as e:
-            # IN TOÀN BỘ LỖI CHI TIẾT RA CLOUDWATCH
             logger.error(f"❌ Chat Error: {str(e)}")
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e))

@@ -33,21 +33,15 @@ class ChatHistoryResponse(BaseModel):
 router = APIRouter(prefix="/api/chat-history", tags=["chat-history"])
 
 def create_chat_history_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
-    """Factory function để tạo router lấy lịch sử chat từ Qdrant"""
 
+    # Đảm bảo path bắt đầu bằng /sessions nhưng không có / ở cuối cùng
     @router.get("/sessions/{session_id}", response_model=ChatHistoryResponse)
     async def get_session_history(
         session_id: str,
         user_id: str = Depends(get_current_user)
     ):
-        """
-        Lấy lịch sử chat cho 1 session cụ thể từ Qdrant Cloud.
-        """
-        # Ghi log khi bắt đầu nhận request từ FE
         logger.info(f"📜 Request lấy lịch sử: User={user_id} | Session={session_id}")
-        
         try:
-            # Gọi repository để lấy dữ liệu
             turns = long_memory_repo.get_session_chat_turns(
                 user_id=user_id,
                 session_id=session_id,
@@ -61,29 +55,15 @@ def create_chat_history_router(long_memory_repo: ILongMemoryRepository) -> APIRo
                 ai_msg = turn.get("ai_msg", "")
 
                 if user_msg:
-                    messages.append(ChatMessageDTO(
-                        role="user",
-                        content=user_msg,
-                        timestamp=ts
-                    ))
+                    messages.append(ChatMessageDTO(role="user", content=user_msg, timestamp=ts))
                 if ai_msg:
-                    messages.append(ChatMessageDTO(
-                        role="assistant",
-                        content=ai_msg,
-                        timestamp=ts
-                    ))
+                    messages.append(ChatMessageDTO(role="assistant", content=ai_msg, timestamp=ts))
 
-            logger.info(f"✅ Đã tải xong lịch sử: {len(messages)} tin nhắn cho session {session_id}")
-
-            return ChatHistoryResponse(
-                session_id=session_id,
-                messages=messages
-            )
+            logger.info(f"✅ Đã tải xong lịch sử: {len(messages)} tin nhắn")
+            return ChatHistoryResponse(session_id=session_id, messages=messages)
             
         except Exception as e:
-            # Ghi lại toàn bộ "dấu vết" lỗi để debug trên CloudWatch
-            logger.error(f"❌ Lỗi khi lấy lịch sử chat (Session: {session_id}): {str(e)}")
-            logger.error(traceback.format_exc())
-            raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+            logger.error(f"❌ Lỗi lịch sử: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     return router
