@@ -1,11 +1,14 @@
 """
-Session Management Controller - Updated Logic Only
+Session Management Controller - Updated with Deep Logging
 """
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import List
+import logging
+import traceback
 import uuid
 from datetime import datetime
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 import sys
 from pathlib import Path
@@ -14,56 +17,54 @@ if str(parent_dir) not in sys.path:
     sys.path.insert(0, str(parent_dir))
 
 from LLM_AWS.jwt_auth import get_current_user
-from LLM_AWS.domain.repositories import ILongMemoryRepository # Import Interface
+from LLM_AWS.domain.repositories import ILongMemoryRepository
 
+# Khởi tạo logger đồng bộ với hệ thống
+logger = logging.getLogger("LLM_AWS.session")
 
-# Models (Giữ nguyên không đổi)
 class SessionResponse(BaseModel):
     session_id: str
     title: str
     created_at: str
     last_message: str = ""
 
-
 class CreateSessionRequest(BaseModel):
     title: str = "New Chat"
 
-
-# Router (Giữ nguyên tags và prefix)
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
-
-# Xóa bỏ sessions_db = {} vì đã lấy từ Qdrant
-
-
 def create_session_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
-    """Factory function nhận repo để thay đổi logic nội bộ"""
     
     @router.get("/", response_model=List[SessionResponse])
     async def get_sessions(user_id: str = Depends(get_current_user)):
-        """Lấy danh sách sessions từ Qdrant thay vì RAM"""
-        # Logic mới: Truy vấn từ Vector DB
-        unique_sessions = long_memory_repo.get_unique_sessions(user_id=user_id)
-        
-        # Trả về đúng format List[SessionResponse]
-        return [
-            SessionResponse(
-                session_id=s["session_id"],
-                title=s["title"],
-                created_at=s["created_at"],
-                last_message=s.get("last_message", "")
-            ) for s in unique_sessions
-        ]
+        logger.info(f"🔍 [GET SESSIONS] Đang quét danh sách hội thoại cho User: {user_id}")
+        try:
+            # Truy vấn thực tế từ Qdrant
+            unique_sessions = long_memory_repo.get_unique_sessions(user_id=user_id)
+            
+            logger.info(f"📊 [GET SESSIONS] Thành công. Tìm thấy {len(unique_sessions)} hội thoại.")
+            
+            return [
+                SessionResponse(
+                    session_id=s["session_id"],
+                    title=s["title"],
+                    created_at=s["created_at"],
+                    last_message=s.get("last_message", "")
+                ) for s in unique_sessions
+            ]
+        except Exception as e:
+            logger.error(f"❌ [GET SESSIONS] Lỗi truy vấn Qdrant: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail="Không thể lấy danh sách session")
     
     @router.post("/", response_model=SessionResponse)
     async def create_session(
         request: CreateSessionRequest,
         user_id: str = Depends(get_current_user)
     ):
-        """Tạo session mới (ID ảo, FE vẫn nhận được format cũ)"""
         session_id = str(uuid.uuid4())
+        logger.info(f"🆕 [CREATE SESSION] User {user_id} khởi tạo session mới: {session_id}")
         
-        # Giữ nguyên cấu trúc trả về cho FE
         session = SessionResponse(
             session_id=session_id,
             title=request.title,
@@ -77,12 +78,13 @@ def create_session_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
         session_id: str,
         user_id: str = Depends(get_current_user)
     ):
-        """Xóa session trong Qdrant thay vì RAM"""
+        logger.warning(f"🗑️ [DELETE SESSION] Đang xóa session {session_id} cho User {user_id}")
         try:
-            # Logic mới: Xóa thực tế trong DB
             long_memory_repo.clear_session(user_id=user_id, session_id=session_id)
+            logger.info(f"✅ [DELETE SESSION] Xóa thành công session {session_id}")
             return {"message": "Session deleted"}
         except Exception as e:
+            logger.error(f"❌ [DELETE SESSION] Lỗi khi xóa: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=str(e))
     
     @router.put("/{session_id}/title")
@@ -91,9 +93,7 @@ def create_session_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
         request: CreateSessionRequest,
         user_id: str = Depends(get_current_user)
     ):
-        """Cập nhật title (FE vẫn gọi như cũ)"""
-        # Lưu ý: Logic Qdrant lưu title theo từng bản ghi tin nhắn. 
-        # API này trả về thành công để FE cập nhật UI.
+        logger.info(f"✏️ [UPDATE TITLE] Cập nhật tiêu đề cho {session_id} thành: {request.title}")
         return {"session_id": session_id, "title": request.title}
     
     return router

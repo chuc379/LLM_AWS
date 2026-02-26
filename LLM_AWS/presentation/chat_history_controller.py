@@ -2,6 +2,8 @@
 Presentation Layer - Chat History Controller
 Lấy lịch sử các đoạn chat từ Qdrant (theo user_id + session_id)
 """
+import logging
+import traceback
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Literal
@@ -16,20 +18,19 @@ if str(parent_dir) not in sys.path:
 from LLM_AWS.jwt_auth import get_current_user
 from LLM_AWS.domain.repositories import ILongMemoryRepository
 
+# Khởi tạo logger cho riêng controller này
+logger = logging.getLogger("LLM_AWS.history")
 
 class ChatMessageDTO(BaseModel):
     role: Literal["user", "assistant"]
     content: str
     timestamp: datetime
 
-
 class ChatHistoryResponse(BaseModel):
     session_id: str
     messages: List[ChatMessageDTO]
 
-
 router = APIRouter(prefix="/api/chat-history", tags=["chat-history"])
-
 
 def create_chat_history_router(long_memory_repo: ILongMemoryRepository) -> APIRouter:
     """Factory function để tạo router lấy lịch sử chat từ Qdrant"""
@@ -41,12 +42,12 @@ def create_chat_history_router(long_memory_repo: ILongMemoryRepository) -> APIRo
     ):
         """
         Lấy lịch sử chat cho 1 session cụ thể từ Qdrant Cloud.
-
-        - Dựa trên user_id lấy từ JWT
-        - Lọc theo session_id
-        - Trả về danh sách các message (user + assistant) theo thứ tự thời gian
         """
+        # Ghi log khi bắt đầu nhận request từ FE
+        logger.info(f"📜 Request lấy lịch sử: User={user_id} | Session={session_id}")
+        
         try:
+            # Gọi repository để lấy dữ liệu
             turns = long_memory_repo.get_session_chat_turns(
                 user_id=user_id,
                 session_id=session_id,
@@ -72,12 +73,17 @@ def create_chat_history_router(long_memory_repo: ILongMemoryRepository) -> APIRo
                         timestamp=ts
                     ))
 
+            logger.info(f"✅ Đã tải xong lịch sử: {len(messages)} tin nhắn cho session {session_id}")
+
             return ChatHistoryResponse(
                 session_id=session_id,
                 messages=messages
             )
+            
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            # Ghi lại toàn bộ "dấu vết" lỗi để debug trên CloudWatch
+            logger.error(f"❌ Lỗi khi lấy lịch sử chat (Session: {session_id}): {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
     return router
-

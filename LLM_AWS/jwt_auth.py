@@ -12,9 +12,16 @@ def get_current_user(
     token = x_user_authorization.split(" ", 1)[1]
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        # Thêm tham số leeway (đơn vị: giây)
+        # 300 giây = cho phép lệch tối đa 5 phút giữa Client và Server
+        payload = jwt.decode(
+            token, 
+            SECRET_KEY, 
+            algorithms=["HS256"], 
+            leeway=300  
+        )
+        
         user_id = payload.get("sub")
-
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
 

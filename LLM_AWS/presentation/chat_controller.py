@@ -4,6 +4,7 @@ Presentation Layer - FastAPI Chat Controller
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
+import logging
 
 import sys
 from pathlib import Path
@@ -35,33 +36,27 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 def create_chat_router(chat_usecase: ChatUseCase) -> APIRouter:
-    """Factory function để tạo router với dependencies"""
     
     @router.post("/", response_model=ChatResponseDTO)
     async def chat(
         request: ChatRequestDTO,
         user_id: str = Depends(get_current_user)
     ):
-        """
-        Chat endpoint với JWT authentication
+        # Log khi bắt đầu nhận request
+        logger.info(f"📩 Chat Request: User={user_id}, Session={request.session_id}")
         
-        - Nhận JWT token từ header X-User-Authorization
-        - Extract user_id từ JWT
-        - Xử lý chat với LangGraph agent
-        - Trả về response với sources và memory flags
-        """
         try:
-            # Create domain request
             chat_request = ChatRequest(
                 user_id=user_id,
                 session_id=request.session_id,
                 message=request.message
             )
             
-            # Execute use case
+            # Execute logic
             response = chat_usecase.execute(chat_request)
             
-            # Return DTO
+            logger.info(f"✅ Chat Success: Trả về {len(response.message)} ký tự")
+            
             return ChatResponseDTO(
                 message=response.message,
                 sources=response.sources,
@@ -71,6 +66,9 @@ def create_chat_router(chat_usecase: ChatUseCase) -> APIRouter:
             )
         
         except Exception as e:
+            # IN TOÀN BỘ LỖI CHI TIẾT RA CLOUDWATCH
+            logger.error(f"❌ Chat Error: {str(e)}")
+            logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e))
     
     return router
