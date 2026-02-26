@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
 import logging
+import traceback  # Thêm cái này để không bị lỗi NameError: traceback
 
 import sys
 from pathlib import Path
@@ -12,10 +13,16 @@ parent_dir = Path(__file__).parent.parent.parent
 if str(parent_dir) not in sys.path:
     sys.path.insert(0, str(parent_dir))
 
+# === THÊM 2 DÒNG NÀY VÀO ĐÂY ===
+logger = logging.getLogger("LLM_AWS")
+logger.setLevel(logging.INFO)
+# ===============================
+
 from LLM_AWS.jwt_auth import get_current_user
 from LLM_AWS.application.chat_usecase import ChatUseCase
 from LLM_AWS.domain.entities import ChatRequest
 
+# ... giữ nguyên phần còn lại của bạn ...
 
 # Request/Response Models
 class ChatRequestDTO(BaseModel):
