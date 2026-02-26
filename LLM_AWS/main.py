@@ -96,10 +96,17 @@ def create_app() -> FastAPI:
         # CORS: Mở rộng để chấp nhận cả header tùy chỉnh của bạn
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"], # Để * khi debug, sau đó đổi thành domain FE của bạn
+            allow_origins=["*"], # Hoặc ["http://localhost:5173"] để bảo mật hơn
             allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=[
+                "Content-Type", 
+                "X-User-Authorization", 
+                "Authorization", 
+                "Accept",
+                "X-Requested-With"
+            ],
+            expose_headers=["*"]
         )
 
         # Middleware để log mọi request đi vào (Để bạn thấy log INFO như local)
